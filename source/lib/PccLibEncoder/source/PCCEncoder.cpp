@@ -51,30 +51,27 @@ using namespace std;
 using namespace pcc;
 
 class Buddies {
-  
  public:
-  size_t &getPosU() { return pos_u; }
-  size_t &getPosV() { return pos_v; }
+  int &getPosU() { return pos_u; }
+  int &getPosV() { return pos_v; }
   double &getScore() { return score; }
   PCCPatch &getFather() { return father; }
   PCCPatch &getPatch() { return patch; }
 
-  size_t getPosU() const { return pos_u; }
-  size_t getPosV() const { return pos_v; }
+  int getPosU() const { return pos_u; }
+  int getPosV() const { return pos_v; }
   double getScore() const { return score; }
   PCCPatch getFather() const { return father; }
   PCCPatch getPatch() const { return patch; }
 
-  friend bool operator<(const Buddies &lhs, const Buddies &rhs) {
-    return lhs.score < rhs.score;
-  }
+  friend bool operator<(const Buddies &lhs, const Buddies &rhs) { return lhs.score < rhs.score; }
 
-  private:
-   size_t pos_u;
-   size_t pos_v;
-   double score;
-   PCCPatch father;
-   PCCPatch patch;
+ private:
+  int pos_u;
+  int pos_v;
+  double score;
+  PCCPatch father;
+  PCCPatch patch;
 };
 
 void EncodeUInt32(const uint32_t value, const uint32_t bitCount,
@@ -86,6 +83,10 @@ void EncodeUInt32(const uint32_t value, const uint32_t bitCount,
   }
 }
 
+bool orderByFather(const std::vector<Buddies> lhs, const std::vector<Buddies> rhs) {
+  return lhs[0].getFather().getIndex() < rhs[0].getFather().getIndex();
+}
+
 // Empty Space
 bool wasteSpace(const PCCPatch &lhs, const PCCPatch &rhs) {
   return (lhs.getSizeV0() * lhs.getSizeU0() - lhs.getPixelCount()) !=
@@ -94,6 +95,9 @@ bool wasteSpace(const PCCPatch &lhs, const PCCPatch &rhs) {
                    (rhs.getSizeV0() * rhs.getSizeU0() - rhs.getPixelCount())
              : lhs.getIndex() < rhs.getIndex();
 }
+
+// Empty Space
+bool byIndex(const PCCPatch &lhs, const PCCPatch &rhs) { return lhs.getIndex() < rhs.getIndex(); }
 
 // Effective Area one - Block level
 bool effectiveArea(const PCCPatch &lhs, const PCCPatch &rhs) {
@@ -524,7 +528,8 @@ void PCCEncoder::countPixels(PCCPatch &patch) {
 }*/
 
 double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
-                             std::vector<bool> occupancy_, size_t pos_u, size_t pos_v) {
+                             std::vector<bool> occupancy_, size_t pos_u, size_t pos_v,
+                             PCCPatch &second_patch) {
   const int16_t infiniteDepth = (std::numeric_limits<int16_t>::max)();
   double sum = 0.0;
   // search right
@@ -537,9 +542,9 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
     if ((int(pos_v * params_.occupancyResolution_) + int(v) -
          int((bb_patch.getSizeV0() * params_.occupancyResolution_))) >= 0 &&
         (((pos_v * params_.occupancyResolution_) + v) <
-         ((bb_patch.getSizeV0() + father_patch.getSizeV0()) * params_.occupancyResolution_))) {
+         (((bb_patch.getSizeV0()) * params_.occupancyResolution_) + father_patch.getSizeV()))) {
       // std::cout << " " << v << std::endl;
-      for (size_t u = bb_patch.getSizeU() - 1; u > 0; u--) {
+      for (size_t u = bb_patch.getSizeU(); u > 0; u--) {
         // std::cout << u << " " << v << std::endl;
         if (bb_patch.getDepth(0)[(v * bb_patch.getSizeU()) + u] != infiniteDepth) {
           uright = u;
@@ -563,6 +568,7 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
       // std::cout << "Encontrei o mais à esquerda do father " << uleft << std::endl;
       // std::cout << "Parei no v = " << v << std::endl;
     }
+    // std::cout << uleft << " " << uright << std::endl;
     if ((uleft != infiniteDepth) && (uright != infiniteDepth) &&
         (int(uleft) > (int(uright) - ((int(bb_patch.getSizeU0()) - int(pos_u)) *
                                       int(params_.occupancyResolution_))))) {
@@ -572,6 +578,8 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
                          (bb_patch.getSizeV0() * params_.occupancyResolution_)) *
                         father_patch.getSizeU()) +
                        uleft;
+      // std::cout << bb_patch.getColor(0).size() << " " << bb_patch.getSizeU() << " " <<
+      // bb_patch.getSizeV() << std::endl;
       int sum1 =
           pow(int((father_patch.getColor(0)[pfather]) - int(bb_patch.getColor(0)[pson])), 2) +
           pow(int((father_patch.getColor(1)[pfather]) - int(bb_patch.getColor(1)[pson])), 2) +
@@ -598,16 +606,26 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
       sum = sum + sum2;
     }
   }
-
+  // std::cout << num_pixels << std::endl;
   // search left
-
+  // std::cout << "I die Hereeeee2" << std::endl;
+  if (pos_v == 66) {
+    // std::cout << "I die Hereeeee7" << std::endl;
+    // std::cout << v << " " << bb_patch.getSizeV() << std::endl;
+  }
   for (size_t v = 0; v < bb_patch.getSizeV(); ++v) {
+    if (pos_v == 66) {
+      // std::cout << "I die Hereeeee88" << std::endl;
+      // std::cout << v << " " << bb_patch.getSizeV() << std::endl;
+    }
+    // std::cout << v << std::endl;
     size_t uright = infiniteDepth;
     size_t uleft = infiniteDepth;
+    // std::cout << "I die Hereeeee5" << std::endl;
     if ((int(pos_v * params_.occupancyResolution_) + int(v) -
          int((bb_patch.getSizeV0() * params_.occupancyResolution_))) >= 0 &&
         (((pos_v * params_.occupancyResolution_) + v) <
-         ((bb_patch.getSizeV0() + father_patch.getSizeV0()) * params_.occupancyResolution_))) {
+         (((bb_patch.getSizeV0()) * params_.occupancyResolution_) + father_patch.getSizeV()))) {
       for (size_t u = 0; u < bb_patch.getSizeU(); u++) {
         if (bb_patch.getDepth(0)[(v * bb_patch.getSizeU()) + u] != infiniteDepth) {
           uleft = u;
@@ -624,6 +642,11 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
         }
       }
     }
+    if (pos_v == 66) {
+      // std::cout << "I die Hereeeee99" << std::endl;
+      // std::cout << v << " " << bb_patch.getSizeV() << std::endl;
+    }
+    // std::cout << "I die Hereeeee6" << std::endl;
     if ((uleft != infiniteDepth) && (uright != infiniteDepth) &&
         (int(uleft) > (int(uright) + ((int(bb_patch.getSizeU0()) - int(pos_u)) *
                                       int(params_.occupancyResolution_))))) {
@@ -632,32 +655,49 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
                          (bb_patch.getSizeV0() * params_.occupancyResolution_)) *
                         father_patch.getSizeU()) +
                        uright;
+      if (pos_v == 66) {
+        // std::cout << pfather << " " << father_patch.getColor(0).size() << " " <<
+        // father_patch.getDepth(0).size() << std::endl;
+        // std::cout << v << " " << bb_patch.getSizeV() << std::endl;
+      }
+      // std::cout << pfather << " " << father_patch.getColor(0).size() << " " <<
+      // father_patch.getDepth(0).size() << std::endl;
       int sum1 =
           pow(int((father_patch.getColor(0)[pfather]) - int(bb_patch.getColor(0)[pson])), 2) +
           pow(int((father_patch.getColor(1)[pfather]) - int(bb_patch.getColor(1)[pson])), 2) +
           pow(int((father_patch.getColor(2)[pfather]) - int(bb_patch.getColor(2)[pson])), 2);
       double sum2 = sqrt((double(sum1) / (3.0 * 255.0 * 255.0)));
+      if (pos_v == 66) {
+        // std::cout << "I die Hereeeee222" << std::endl;
+        // std::cout << v << " " << bb_patch.getSizeV() << std::endl;
+      }
       sum = sum + sum2;
       num_pixels++;
     }
   }
-
+  if (pos_v == 66) {
+    // std::cout << "I die Hereeeee8" << std::endl;
+    // std::cout << v << " " << bb_patch.getSizeV() << std::endl;
+  }
+  // std::cout << num_pixels << std::endl;
   // search up
-
+  // std::cout << "I die Hereeeee3" << std::endl;
   for (size_t u = 0; u < bb_patch.getSizeU(); ++u) {
+    // std::cout << "I die Hereeeee" << std::endl;
     size_t vup = infiniteDepth;
     size_t vdown = infiniteDepth;
     if ((int(pos_u * params_.occupancyResolution_) + int(u) -
          int((bb_patch.getSizeU0() * params_.occupancyResolution_))) >= 0 &&
         (((pos_u * params_.occupancyResolution_) + u) <
-         ((bb_patch.getSizeU0() + father_patch.getSizeU0()) * params_.occupancyResolution_))) {
+         (((bb_patch.getSizeU0()) * params_.occupancyResolution_) + father_patch.getSizeU()))) {
+      // std::cout << "I die Here" << std::endl;
       for (size_t v = 0; v < bb_patch.getSizeV(); v++) {
         if (bb_patch.getDepth(0)[(v * bb_patch.getSizeU()) + u] != infiniteDepth) {
           vup = v;
           break;
         }
       }
-      for (size_t v = father_patch.getSizeV(); v > 0; v--) {
+      for (size_t v = father_patch.getSizeV() - 1; v > 0; v--) {
         if (father_patch.getDepth(0)[(v * father_patch.getSizeU()) +
                                      ((pos_u * params_.occupancyResolution_) + u -
                                       (bb_patch.getSizeU0() * params_.occupancyResolution_))] !=
@@ -670,8 +710,9 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
     if ((vup != infiniteDepth) && (vdown != infiniteDepth) &&
         (int(vup) > (int(vdown) + ((int(bb_patch.getSizeV0()) - int(pos_v)) *
                                    int(params_.occupancyResolution_))))) {
-      // std::cout << "Breaks at " << pos_v << " " << vdown << " " << bb_patch.getSizeV0() << " " <<
-      // u << std::endl;
+      // std::cout << "I die Here7" << std::endl;
+      // std::cout << "Breaks at " << pos_v << " " << vdown << " " << father_patch.getSizeV() << " "
+      // <<  u << std::endl;
       size_t pson = (vup * bb_patch.getSizeU()) + u;
       size_t pfather = (vdown * father_patch.getSizeU()) +
                        ((pos_u * params_.occupancyResolution_) + u -
@@ -685,23 +726,28 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
       num_pixels++;
     }
   }
+  if (pos_v == 66) {
+    // std::cout << "I die Hereeeee9" << std::endl;
+    // std::cout << v << " " << bb_patch.getSizeV() << std::endl;
+  }
+  // std::cout << num_pixels << std::endl;
 
   // search down
-
+  // std::cout << "I die Hereeeee4" << std::endl;
   for (size_t u = 0; u < bb_patch.getSizeU(); ++u) {
     size_t vup = infiniteDepth;
     size_t vdown = infiniteDepth;
     if ((int(pos_u * params_.occupancyResolution_) + int(u) -
          int((bb_patch.getSizeU0() * params_.occupancyResolution_))) >= 0 &&
         (((pos_u * params_.occupancyResolution_) + u) <
-         ((bb_patch.getSizeU0() + father_patch.getSizeU0()) * params_.occupancyResolution_))) {
-      for (size_t v = bb_patch.getSizeV() - 1; v > 0; v--) {
+         (((bb_patch.getSizeU0()) * params_.occupancyResolution_) + father_patch.getSizeU()))) {
+      for (size_t v = bb_patch.getSizeV(); v > 0; v--) {
         if (bb_patch.getDepth(0)[(v * bb_patch.getSizeU()) + u] != infiniteDepth) {
           vdown = v;
           break;
         }
       }
-      for (size_t v = 0; v < father_patch.getSizeV(); v++) {
+      for (size_t v = 0; v < father_patch.getSizeV() - 1; v++) {
         if (father_patch.getDepth(0)[(v * father_patch.getSizeU()) +
                                      ((pos_u * params_.occupancyResolution_) + u -
                                       (bb_patch.getSizeU0() * params_.occupancyResolution_))] !=
@@ -711,6 +757,7 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
         }
       }
     }
+    // std::cout << vup << " " << vdown << std::endl;
     if ((vup != infiniteDepth) && (vdown != infiniteDepth) &&
         (int(vup) > (int(vdown) - ((int(bb_patch.getSizeV0()) - int(pos_v)) *
                                    int(params_.occupancyResolution_))))) {
@@ -731,6 +778,7 @@ double PCCEncoder::computeSM(PCCPatch &father_patch, PCCPatch &bb_patch,
   double percentage_pixels =
       double(num_pixels) / double((2 * bb_patch.getSizeU()) + (2 * bb_patch.getSizeV()));
   // std::cout << num_pixels << " " << percentage_pixels << std::endl;
+  // getchar();
   return (sum / (double(num_pixels))) / percentage_pixels;
 }
 
@@ -748,10 +796,14 @@ void PCCEncoder::packBestBuddies(PCCFrameContext &frame, size_t frameIndex) {
   double bestBestInter = 1000000.0;
 
   for (auto &patch : patches) {
-    /*if (i == 0) {
-      i++;
-      continue;
-    }*/
+    // std::cout << i << std::endl;
+    if (i == 1) {
+      // printMap(patch.getOccupancy(), patch.getSizeU0(), patch.getSizeV0());
+    }
+    if (i != 6) {
+      //i++;
+      //continue;
+    }
     /*if (i == 2) {
       break;
     }*/
@@ -770,6 +822,7 @@ void PCCEncoder::packBestBuddies(PCCFrameContext &frame, size_t frameIndex) {
       maxW = (std::max)(maxW, patch1.getSizeU0());
     }
     j = 0;
+    // std::cout << "Chego Aqui" << std::endl;
     bigOcW = patch.getSizeU0() + (2 * maxW);
     bigOcH = patch.getSizeV0() + (2 * patches[i + 1].getSizeV0());
     std::vector<bool> tmpOccupancyMap;
@@ -790,27 +843,55 @@ void PCCEncoder::packBestBuddies(PCCFrameContext &frame, size_t frameIndex) {
       vl1 = 0;
       ul1 = ul1 + 1;
     }
+    // std::cout << "Chego Aqui" << std::endl;
     for (auto &patch1 : patches) {
       /*if (i <6) {
         i++;
         continue;
       }*/
+      // std::cout << j << std::endl;
       if (j <= i) {
         j++;
         continue;
       }
-      /*if (j == 5) {
-        break;
+      /*if (patch1.getSizeU() > patch.getSizeU() || patch1.getSizeV() > patch.getSizeV()) {
+        continue;
       }*/
+      if (j == 1) {
+        //break;
+      }
       double bestInter = 1000000.0;
+      //std::cout << j << " " << i << " " << patch1.getSizeU0() << " " << patch1.getSizeV0() << std::endl;
+      // std::cout << j << " " << patch.getSizeU0() << " " << patch.getSizeV0() << std::endl;
+
+      // printMap(patch1.getOccupancy(), patch1.getSizeU0(), patch1.getSizeV0());
 
       // copy to the center
       size_t uu = 0;
       size_t vv = 0;
+      int uuu = 0;
+      int vvv = 0;
+      int uuuu = 0;
+      int vvvv = 0;
 
       bool out = 0;
+      // if (j == i+1) {
+      // std::cout << "Chego Aqui" << std::endl;
+      //}
+      // std::cout << "Morro no " << i << " " << j << std::endl;
+      // std::cout << "one " << patch1.getSizeU0() << " " << patch.getSizeU0() << std::endl;
+      // std::cout << "two " << patch1.getSizeV0() << " " << patch.getSizeV0() << std::endl;
+      // std::cout << "two " << bigOcW << " " << bigOcH << std::endl;
       for (size_t v = 0; v <= patch.getSizeV0() + patch1.getSizeV0() && out == 0; ++v) {
         for (size_t u = 0; u <= patch.getSizeU0() + patch1.getSizeU0() && out == 0; ++u) {
+          if (u == 0 && v == 0) {
+            continue;
+          }
+          if (u == patch.getSizeU0() + patch1.getSizeU0() &&
+              v == patch.getSizeV0() + patch1.getSizeV0()) {
+            continue;
+          }
+          // std::cout << "ooooooo" << std::endl;
           bool canFit = true;
           for (size_t v0 = 0; v0 < patch1.getSizeV0() && canFit; ++v0) {
             const size_t y = v + patches[i + 1].getSizeV0() - patch1.getSizeV0() + v0;
@@ -821,37 +902,231 @@ void PCCEncoder::packBestBuddies(PCCFrameContext &frame, size_t frameIndex) {
                 canFit = false;
                 break;
               }
+              // std::cout << "eeeeee"<<std::endl;
             }
           }
           if (!canFit) {
             continue;
           }
-          // std::cout << "Starting Computation for " << u << " and " << v << std::endl;
-          double inter = computeSM(patch, patch1, tmpOccupancyMap, u, v);
-          // std::cout << "Score = "<< inter << std::endl;
-          if (inter < bestInter && inter != 0.0) {
-            bestInter = inter;
+          // std::cout << "chis" << uuu - int(maxW) << " " << vvv - int(patches[i + 1].getSizeV0())
+          // << std::endl;
+          if (j == 1) {
+            //std::cout << "chego aqui" << std::endl;
+            // u = 14;
+            // v = 0;
+            // std::cout << "Pos = " << int(u + maxW - patch1.getSizeU0()) - int(maxW) << " " <<
+            // int(v + patches[i + 1].getSizeV0() - patch1.getSizeV0()) - int(patches[i +
+            // 1].getSizeV0()) << std::endl;
+          }
+          if (j == 3) {
+            // std::cout << "Estou Aqui" << std::endl;
+          }
+          // std::cout << "eeeeee" << std::endl;
+          uuu = int(u + maxW - patch1.getSizeU0());  // - int(maxW);
+          vvv = int(v + patches[i + 1].getSizeV0() -
+                    patch1.getSizeV0());  // - int(patches[i + 1].getSizeV0());
+          // std::cout << uuu - int(maxW) << " " - int(patches[i + 1].getSizeV0()) << vvv <<
+          // std::endl;
+          if (j == 10) {
+            // std::cout << uuu - int(maxW) << " " << vvv - int(patches[i + 1].getSizeV0()) <<
+            // std::endl;
+          }
+          if (uuu - int(maxW) < 0 && vvv - int(patches[i + 1].getSizeV0()) < 0) {
+            // std::cout << "oooooo" << std::endl;
+            for (size_t u1 = 0; u1 < uuu + patch1.getSizeU0() - maxW; u1++) {
+              if (occupancyMap[u1] == true) {
+                canFit = false;
+              }
+            }
+            for (size_t v1 = 0; v1 < vvv + patch1.getSizeV0() - patches[i + 1].getSizeV0(); v1++) {
+              if (occupancyMap[v1 * patch.getSizeU0()] == true) {
+                canFit = false;
+              }
+            }
+          } else if (uuu - int(maxW) < 0) {
+            for (size_t u1 = 0; u1 < uuu + patch1.getSizeU0() - maxW; u1++) {
+              if (occupancyMap[u1 + ((patch.getSizeV0() - 1) * (patch.getSizeU0()))] == true) {
+                canFit = false;
+              }
+            }
+            for (size_t v1 = vvv - int(patches[i + 1].getSizeV0());
+                 (v1 < (vvv - int(patches[i + 1].getSizeV0())) + patch1.getSizeV0()) &&
+                 v1 < patch.getSizeV0();
+                 v1++) {
+              if (occupancyMap[v1 * patch.getSizeU0()] == true) {
+                canFit = false;
+              }
+            }
+          } else if (vvv - int(patches[i + 1].getSizeV0()) < 0) {
+            if (j == 10) {
+              // std::cout << "oooooo" << std::endl;
+            }
+            for (size_t v1 = 0; v1 < vvv + patch1.getSizeV0() - patches[i + 1].getSizeV0(); v1++) {
+              if (occupancyMap[v1 * patch.getSizeU0() + patch.getSizeU0() - 1] == true) {
+                canFit = false;
+              }
+            }
+            for (size_t u1 = uuu - int(maxW);
+                 (u1 < (uuu - int(maxW)) + patch1.getSizeU0()) && u1 < patch.getSizeU0(); u1++) {
+              if (j == 10) {
+                // std::cout << "oooooo" << std::endl;
+              }
+              if (occupancyMap[u1] == true) {
+                canFit = false;
+              }
+            }
+          } else {
+            for (size_t v1 = vvv - int(patches[i + 1].getSizeV0());
+                 (v1 < (vvv - int(patches[i + 1].getSizeV0())) + patch1.getSizeV0()) &&
+                 v1 < patch.getSizeV0();
+                 v1++) {
+              if (occupancyMap[v1 * patch.getSizeU0() + patch.getSizeU0() - 1] == true) {
+                canFit = false;
+              }
+            }
+            for (size_t u1 = uuu - int(maxW);
+                 (u1 < (uuu - int(maxW)) + patch1.getSizeU0()) && u1 < patch.getSizeU0(); u1++) {
+              if (occupancyMap[u1 + ((patch.getSizeV0() - 1) * (patch.getSizeU0()))] == true) {
+                canFit = false;
+              }
+            }
+          }
+          if (j == 3) {
+            // std::cout << "Estou Aqui2" << std::endl;
+          }
+          if (j == 1) {
+            //std::cout << "chego aqui2" << std::endl;
+          }
+          // std::cout << "ooooooo" << std::endl;
+          // std::cout << "eeeeee" << std::endl;
+          if (!canFit) {
+            if (j == 7) {
+			  //std::cout << uuu - int(maxW) << " " << vvv - int(patches[i + 1].getSizeV0()) << std::endl;
+			  //std::cout << "lll" << std::endl;
+            }
+            if (j == 3) {
+              // std::cout << "Estou Aqui3" << std::endl;
+            }
+            if (j == 28) {
+              // std::cout << "Starting Computation for " << u << " and " << v << std::endl;
+            }
+            // std::cout << uuu - int(maxW) << " " << vvv - int(patches[i + 1].getSizeV0()) <<
+            // std::endl;
+            continue;
+          }
+          if (j == 7) {
+            //std::cout << uuu - int(maxW) << " " << vvv - int(patches[i + 1].getSizeV0()) << std::endl;
+            //std::cout << "vvv" << std::endl;
+          }
+          
+          if (j == 7) {
+            // std::cout << "Starting Computation for " << u << " and " << v << std::endl;
+            // std::cout << "one " << patch1.getSizeU0() << " " << patch.getSizeU0() << std::endl;
+            // std::cout << "two " << patch1.getSizeV0() << " " << patch.getSizeV0() << std::endl;
+          }
+          // std::cout << uuu - int(maxW) << " " << vvv - int(patches[i + 1].getSizeV0()) <<
+          // std::endl;  std::cout << "aaaaaaa" << std::endl;  std::cout << "Starting Computation for "
+          // << u << " and " << v << std::endl;
+          // u = 0;
+          // v = 55;
+          if (j == 28) {
+            // std::cout << "Starting Computation for " << u << " and " << v << std::endl;
+          }
+
+          double inter = computeSM(patch, patch1, tmpOccupancyMap, u, v, patches[i + 1]);
+          if (j == 3) {
+            // std::cout << "Estou Aqui5" << std::endl;
+          }
+          if (j == 1) {
+            //std::cout << "Score = " << inter << std::endl;
+          }
+          // std::cout << "eeeeee" << std::endl;
+          // std::cout << "Pos = " << int(u + maxW - patch1.getSizeU0()) - int(maxW) << " " << int(v
+          // + patches[i + 1].getSizeV0() - patch1.getSizeV0()) - int(patches[i + 1].getSizeV0()) <<
+          // std::endl;  std::cout << "Score = "<< inter << std::endl;
+          if (inter <= bestInter && inter != 0.0) {
+            uuuu = int(u + maxW - patch1.getSizeU0());  // - int(maxW);
+            vvvv = int(v + patches[i + 1].getSizeV0() -
+                       patch1.getSizeV0());  // - int(patches[i + 1].getSizeV0());
             uu = u + maxW - patch1.getSizeU0();
             vv = v + patches[i + 1].getSizeV0() - patch1.getSizeV0();
+            bestInter = inter;
             patch1.getU0() = uu;
             patch1.getV0() = vv;
+          }
+          if (j == 10) {
+            // out = 1;
           }
           // out=1;
           // break;
         }
         // break;
       }
-      // printMap(tmpOccupancyMap, patches[0].getSizeU0() + (2 * patch.getSizeU0()),
-      // patches[0].getSizeV0()+(2*patch.getSizeV0()));
-      j++;
-      //std::cout << "Best Score= " << bestInter / (2*patch1.getSizeU() + 2*patch1.getSizeV())
-        //        << std::endl;
-      if ((bestInter / (2*patch1.getSizeU() + 2*patch1.getSizeV())) < bestBestInter) {
-        bestBestInter = bestInter / (2*patch1.getSizeU() + 2*patch1.getSizeV());
-        firstPatch = i;
+      // std::cout << "ooooooo" << std::endl;
+      if (j == 4) {
+        //std::cout << "Pos = " << int(uu) << " " << int(vv) << std::endl;
       }
-      //std::cout << "Pos = " << uu << " " << vv << std::endl;
-      if (uu != 0 && vv != 0) {
+      if (j == 1) {
+        //printMap(patch1.getOccupancy(), patch1.getSizeU0(), patch1.getSizeV0());
+      }
+      j++;
+      // std::cout << "Best Score= " << bestInter / (2*patch1.getSizeU() + 2*patch1.getSizeV())
+      //        << std::endl;
+      if ((bestInter / (2 * patch1.getSizeU() + 2 * patch1.getSizeV())) < bestBestInter) {
+        bestBestInter = bestInter / (2 * patch1.getSizeU() + 2 * patch1.getSizeV());
+        firstPatch = patch.getIndex();
+      }
+      if (j == 5) {
+        //std::cout << "Specs = " << patch1.getSizeU0() << " " << patches[i + 1].getSizeU0() << std::endl;
+      }
+      // std::cout << "Pos = " << int(uu) - int(maxW) << " " << int(vv) - int(patches[i +
+      // 1].getSizeV0()) << std::endl;  std::cout << "Pos = " << int(uuuu) - int(maxW) << " " <<
+      // int(vvvv) - int(patches[i + 1].getSizeV0()) << std::endl;
+      if (uu != 0 || vv != 0) {
+        if (uuuu - int(maxW) < 0 && vvvv - int(patches[i + 1].getSizeV0()) < 0) {
+          for (size_t u1 = 0; u1 < uuuu + patch1.getSizeU0() - maxW; u1++) {
+            occupancyMap[u1] = true;
+          }
+          for (size_t v1 = 0; v1 < vvvv + patch1.getSizeV0() - patches[i + 1].getSizeV0(); v1++) {
+            occupancyMap[v1 * patch.getSizeU0()] = true;
+          }
+        } else if (uuuu - int(maxW) < 0) {
+          // std::cout << "Estou Aqui" << std::endl;
+          for (size_t u1 = 0; u1 < uuuu + patch1.getSizeU0() - maxW; u1++) {
+            occupancyMap[u1 + ((patch.getSizeV0() - 1) * patch.getSizeU0())] = true;
+          }
+          for (size_t v1 = vvvv - int(patches[i + 1].getSizeV0());
+               (v1 < (vvvv - int(patches[i + 1].getSizeV0())) + patch1.getSizeV0()) &&
+               v1 < patch.getSizeV0();
+               v1++) {
+            occupancyMap[v1 * patch.getSizeU0()] = true;
+          }
+        } else if (vvvv - int(patches[i + 1].getSizeV0()) < 0) {
+          for (size_t v1 = 0; v1 < vvvv + patch1.getSizeV0() - patches[i + 1].getSizeV0(); v1++) {
+            occupancyMap[v1 * patch.getSizeU0() + patch.getSizeU0() - 1] = true;
+          }
+          for (size_t u1 = uuuu - int(maxW);
+               (u1 < (uuuu - int(maxW)) + patch1.getSizeU0()) && u1 < patch.getSizeU0(); u1++) {
+            occupancyMap[u1] = true;
+          }
+        } else {
+          // std::cout << vvvv - int(patches[i + 1].getSizeV0()) << std::endl;
+          for (size_t v1 = vvvv - int(patches[i + 1].getSizeV0());
+               (v1 < (vvvv - int(patches[i + 1].getSizeV0())) + patch1.getSizeV0()) &&
+               v1 < patch.getSizeV0();
+               v1++) {
+            // std::cout << "eeeeee" << std::endl;
+            occupancyMap[v1 * patch.getSizeU0() + patch.getSizeU0() - 1] = true;
+          }
+          for (size_t u1 = uuuu - int(maxW);
+               (u1 < (uuuu - int(maxW)) + patch1.getSizeU0()) && u1 < patch.getSizeU0(); u1++) {
+            occupancyMap[u1 + ((patch.getSizeV0() - 1) * (patch.getSizeU0()))] = true;
+          }
+        }
+        // if (j == 27 || j == 28) {
+        // printMap(occupancyMap, patch.getSizeU0(), patch.getSizeV0());
+        //}
+         //printMap(occupancyMap, patch.getSizeU0(), patch.getSizeV0());
         for (size_t v0 = 0; v0 < patch1.getSizeV0(); ++v0) {
           const size_t v = vv + v0;
           for (size_t u0 = 0; u0 < patch1.getSizeU0(); ++u0) {
@@ -869,30 +1144,39 @@ void PCCEncoder::packBestBuddies(PCCFrameContext &frame, size_t frameIndex) {
             }
           }
         }
-        best_buddies[i].resize(best_buddies[i].size() + 1);
-        best_buddies[i][best_buddies[i].size() - 1].getFather() = patch;
-        best_buddies[i][best_buddies[i].size() - 1].getPatch() = patch1;
-        best_buddies[i][best_buddies[i].size() - 1].getPosU() = uu;
-        best_buddies[i][best_buddies[i].size() - 1].getPosV() = vv;
-        best_buddies[i][best_buddies[i].size() - 1].getScore() = bestInter / (2*patch1.getSizeU() + 2*patch1.getSizeV());
-        std::sort(best_buddies[i].begin(), best_buddies[i].end());
-        height = (std::max)(height,
-                            (patch1.getV0() + patch1.getSizeV0()) * patch1.getOccupancyResolution());
-        width =
-            (std::max)(width, (patch1.getU0() + patch1.getSizeU0()) * patch1.getOccupancyResolution());
+        best_buddies[patch.getIndex()].resize(best_buddies[patch.getIndex()].size() + 1);
+        best_buddies[patch.getIndex()][best_buddies[patch.getIndex()].size() - 1].getFather() =
+          patch;
+        best_buddies[patch.getIndex()][best_buddies[patch.getIndex()].size() - 1].getPatch() =
+          patch1;
+        best_buddies[patch.getIndex()][best_buddies[patch.getIndex()].size() - 1].getPosU() =
+          int(uu) - int(maxW);
+        best_buddies[patch.getIndex()][best_buddies[patch.getIndex()].size() - 1].getPosV() =
+          int(vv) - int(patches[i + 1].getSizeV0());
+        best_buddies[patch.getIndex()][best_buddies[patch.getIndex()].size() - 1].getScore() =
+          bestInter / (2 * patch1.getSizeU() + 2 * patch1.getSizeV());
+        std::sort(best_buddies[patch.getIndex()].begin(), best_buddies[patch.getIndex()].end());
+        height = (std::max)(
+          height, (patch1.getV0() + patch1.getSizeV0()) * patch1.getOccupancyResolution());
+        width = (std::max)(width,
+                        (patch1.getU0() + patch1.getSizeU0()) * patch1.getOccupancyResolution());
         k++;
+        //printMap(tmpOccupancyMap, bigOcW , bigOcH);
         kpatches.push_back(patch1);
       }
+      // printMap(tmpOccupancyMap, bigOcW, bigOcH);
     }
-    //printMap(tmpOccupancyMap, bigOcW, bigOcH);
+    printMap(occupancyMap, patch.getSizeU0(), patch.getSizeV0());
+    // printMap(tmpOccupancyMap, bigOcW, bigOcH);
     /*for (size_t v0 = 0; v0 < bigOcH; ++v0) {
       for (size_t u0 = 0; u0 < bigOcW; ++u0) {
         std::cout << valuesOccupancyMap[v0*bigOcW + u0] << " ";
-	  }
-	  std::cout << std::endl;
+          }
+          std::cout << std::endl;
     }*/
     i++;
-    std::cout << std::endl;
+    std::cout << "Acabei o " << i << std::endl;
+    // std::cout << std::endl;
     /*for (size_t k = 0; k < best_buddies[0].size(); k++) {
       std::cout << "Father = " << best_buddies[0][k].getFather().getIndex() << std::endl;
       std::cout << "Patch = " << best_buddies[0][k].getPatch().getIndex() << std::endl;
@@ -902,20 +1186,401 @@ void PCCEncoder::packBestBuddies(PCCFrameContext &frame, size_t frameIndex) {
       std::cout << std::endl;
     }*/
   }
-  std::cout << std::endl << std::endl << std::endl;
-  std::cout << "First Patch = " << bestBestInter << std::endl;
-  std::cout << "First Patch = " << firstPatch << std::endl;
-  std::vector<Buddies> buddies_pool = best_buddies[firstPatch];
-  for (size_t k = 0; k < best_buddies[firstPatch].size(); k++) {
-    std::cout << "Father = " << buddies_pool[k].getFather().getIndex() << std::endl;
-    std::cout << "Patch = " << buddies_pool[k].getPatch().getIndex() << std::endl;
-    std::cout << "U = " << buddies_pool[k].getPosU() << std::endl;
-    std::cout << "V = " << buddies_pool[k].getPosV() << std::endl;
-    std::cout << "Score = " << buddies_pool[k].getScore() << std::endl;
-    std::cout << std::endl;
-  }
   //patches = kpatches;
-  //std::wcout << patches.size() << std::endl;
+  // std::cout << std::endl << std::endl << std::endl;
+  std::cout << "Acabei" << std::endl;
+  getchar();
+  // std::cout << "First Patch = " << bestBestInter << std::endl;
+  // std::cout << "First Patch = " << firstPatch << std::endl;
+  std::vector<Buddies> buddies_pool = best_buddies[patches[0].getIndex()];
+  std::vector<pcc::PCCPatch> kkpatches;
+  //std::sort(best_buddies.begin(), best_buddies.end(), orderByFather);
+  for (size_t k = 0; k < best_buddies[patches[0].getIndex()].size(); k++) {
+	//std::cout << "Father = " << buddies_pool[k].getFather().getIndex() << std::endl;
+	//std::cout << "Patch = " << buddies_pool[k].getPatch().getIndex() << std::endl;
+	//std::cout << "U = " << buddies_pool[k].getPosU() << std::endl;
+	//std::cout << "V = " << buddies_pool[k].getPosV() << std::endl;
+	//std::cout << "Score = " << buddies_pool[k].getScore() << std::endl;
+	//std::cout << std::endl;
+  }
+  std::sort(patches.begin(), patches.end(), byIndex);
+  //std::cout << "Acabo" << std::endl;
+  std::vector<bool> packed;
+  packed.resize(patches.size(), false);
+  size_t l = 1;
+  packed[buddies_pool[0].getFather().getIndex()]=true;
+  //std::cout << "Acabo" << std::endl;
+  std::vector<bool> currOcupancy = buddies_pool[0].getFather().getOccupancy();
+  std::vector<bool> finalOcupancy = buddies_pool[0].getFather().getOccupancy();
+  //std::cout << "Acabo" << std::endl;
+  int fOcW = buddies_pool[0].getFather().getSizeU0();
+  int fOcH = buddies_pool[0].getFather().getSizeV0();
+  //std::cout << "Acabo" << std::endl;
+  patches[buddies_pool[0].getFather().getIndex()].getU0() = 0;
+  patches[buddies_pool[0].getFather().getIndex()].getV0() = 0;
+  //kkpatches.push_back(patches[buddies_pool[0].getFather().getIndex()]);
+  //printMap(currOcupancy, fOcW, fOcH);
+  //std::cout << "Acabo" << std::endl;
+  while (l < patches.size()) {
+    std::cout << "Acabo em " << l << std::endl;
+    //if (l == 20) {
+    //	break;
+    //}
+    bool found_next = 0;
+    Buddies next_patch;
+    size_t s = 0;
+    bool nothing = false;
+    while (found_next == 0) {
+      if (buddies_pool.size() == 0) {
+        nothing = true;
+        break;
+      }
+      next_patch = buddies_pool[0];
+      if (packed[next_patch.getPatch().getIndex()] == 0) {
+        found_next = 1;
+      }
+      buddies_pool.erase(buddies_pool.begin());
+      s++;
+    }
+    if (nothing == true) {
+      l++;
+      break;
+    }
+    //std::cout << "Father = " << next_patch.getFather().getIndex() << std::endl;
+    //std::cout << "Patch = " << next_patch.getPatch().getIndex() << std::endl;
+    //std::cout << "U = " << next_patch.getPosU() << std::endl;
+    //std::cout << "V = " << next_patch.getPosV() << std::endl;
+    //std::cout << "Score = " << next_patch.getScore() << std::endl;
+    int newOcW;
+    int newOcH;
+    bool fit = false;
+    while (fit == false) {
+      //std::cout << "Hey" << std::endl;
+      fit = true;
+      //std::cout << "Father = " << next_patch.getFather().getIndex() << std::endl;
+      //std::cout << "Patch = " << next_patch.getPatch().getIndex() << std::endl;
+      //std::cout << "U = " << next_patch.getPosU() << std::endl;
+      //std::cout << "V = " << next_patch.getPosV() << std::endl;
+      //std::cout << "Score = " << next_patch.getScore() << std::endl;
+      if (next_patch.getPosU() < 0) {
+        newOcW = int(patches[next_patch.getFather().getIndex()].getU0()) +
+                 next_patch.getPosU();
+        if (next_patch.getPatch().getIndex() == 3) {
+          //std::cout << "Bunda no Chão"  << newOcW << std::endl;
+        }
+        if (newOcW > 0) {
+          newOcW = 0;
+          //no need to extend
+        }
+      } else {
+        newOcW = next_patch.getPosU() + int(next_patch.getPatch().getSizeU0()) - (fOcW -
+                 int(patches[next_patch.getFather().getIndex()].getU0()));
+        //std::cout << next_patch.getPosU() << " " << next_patch.getPatch().getSizeU0()
+        //                << " " << fOcW << " " <<
+        //patches[next_patch.getFather().getIndex()].getU0() << std::endl;
+        //std::cout << patches[next_patch.getFather().getIndex()].getU0() << std::endl;
+        //std::cout << next_patch.getFather().getIndex() << std::endl;
+        //std::cout << "Chego Aqui" << std::endl;
+        if (newOcW < 0) {
+          //std::cout << "Chego Aqui" << std::endl;
+          newOcW = 0;
+          // no need to extend
+        }
+      }
+      if (next_patch.getPosV() < 0) {
+        newOcH = int(patches[next_patch.getFather().getIndex()].getV0()) +
+                 next_patch.getPosV();
+        if (newOcH > 0) {
+          newOcH = 0;
+          // no need to extend
+        }
+      } else {
+        newOcH = next_patch.getPosV() + int(next_patch.getPatch().getSizeV0()) -
+                 (fOcH - int(patches[next_patch.getFather().getIndex()].getV0()));
+        //std::cout << next_patch.getPosV() << " " << next_patch.getPatch().getSizeV0()
+        //        << " " << fOcH << " " <<
+        //patches[next_patch.getFather().getIndex()].getV0() << std::endl;
+        if (newOcH < 0) {
+          //std::cout << "Chego Aqui" << std::endl;
+          newOcH = 0;
+          // no need to extend
+        }
+      }
+      //std::cout << "Chego Aqui" << std::endl;
+      //expand occupancy
+      if (newOcW < 0 && newOcH < 0) {
+        //std::cout << "Chego Aqui1" << std::endl;
+        currOcupancy.resize((fOcW - newOcW) * (fOcH - newOcH),false);
+        std::fill(currOcupancy.begin(), currOcupancy.end(), false);
+        //printMap(currOcupancy,(fOcW - newOcW),(fOcH - newOcH));
+        for (size_t u0 = 0; u0 < fOcW; u0++) {
+          size_t u1 = u0 - newOcW;
+          for (size_t v0 = 0; v0 < fOcH; v0++) {
+            size_t v1 = v0 - newOcH;
+            currOcupancy[(v1 * (fOcW - newOcW)) + u1] = finalOcupancy[(v0 * fOcW) +
+                u0];
+          }
+        }
+        //printMap(currOcupancy,(fOcW - newOcW),(fOcH - newOcH));
+        for (size_t u0 = 0; u0 < next_patch.getPatch().getSizeU0(); u0++) {
+          for (size_t v0 = 0; v0 < next_patch.getPatch().getSizeV0(); v0++) {
+            if (currOcupancy[(v0 * (fOcW - newOcW)) + u0] == true &&
+                next_patch.getPatch().getOccupancy()[v0 *
+                       (next_patch.getPatch().getSizeU0()) + u0] == true) {
+              fit = false;
+              //std::cout << u0 << " " << v0 << std::endl;
+              break;
+            }
+            currOcupancy[(v0 * (fOcW - newOcW)) + u0] =
+              next_patch.getPatch().getOccupancy()[v0 * (next_patch.getPatch().getSizeU0()) + u0]
+              || currOcupancy[(v0 * (fOcW - newOcW)) + u0];
+          }
+          if(fit==false) {
+            break;
+          }
+        }
+      } else if (newOcW < 0) {
+        if (next_patch.getPatch().getIndex() == 3) {
+          //std::cout << "Chego Aqui2" << std::endl;
+        }
+        if (next_patch.getPatch().getIndex() == 3) {
+          //printMap(currOcupancy, fOcW, fOcH);
+        }
+        //std::cout << "Chego Aqui2" << std::endl;
+        currOcupancy.resize((fOcW - newOcW) * (fOcH + newOcH),false);
+        if (next_patch.getPatch().getIndex() == 3) {
+          //printMap(currOcupancy, fOcW, fOcH);
+        }
+        std::fill(currOcupancy.begin(), currOcupancy.end(), false);
+        for (size_t u0 = 0; u0 < fOcW; u0++) {
+          size_t u1 = u0 - newOcW;
+          //std::cout << u1 << " ";
+          for (size_t v0 = 0; v0 < fOcH; v0++) {
+            size_t v1 = v0;
+            //std::cout << v1 << " ";
+            currOcupancy[(v1 * (fOcW - newOcW)) + u1] = finalOcupancy[v0 * fOcW + u0];
+          }
+        }
+        if (next_patch.getPatch().getIndex() == 3) {
+          //printMap(currOcupancy, fOcW - newOcW, fOcH + newOcH);
+        }
+        for (size_t u0 = 0; u0 < next_patch.getPatch().getSizeU0(); u0++) {
+          for (size_t v0 = 0; v0 < next_patch.getPatch().getSizeV0(); v0++) {
+            size_t v1 = v0 + next_patch.getPosV() +
+                        patches[next_patch.getFather().getIndex()].getV0();
+            if (currOcupancy[(v1 * (fOcW - newOcW)) + u0]
+                == true && next_patch.getPatch().getOccupancy()[v0 * (next_patch.getPatch().getSizeU0()) + u0] ==
+                true) {
+              if (next_patch.getPatch().getIndex() == 3) {
+                //std::cout << u0 << v1 << std::endl;
+              }
+              fit = false;
+              break;
+            }
+            currOcupancy[(v1 * (fOcW - newOcW)) + u0] =
+              next_patch.getPatch().getOccupancy()[v0 * (next_patch.getPatch().getSizeU0()) + u0]
+              || currOcupancy[(v1 * (fOcW - newOcW)) + u0];
+          }
+          if(fit==false) {
+            break;
+          }
+        }
+      } else if (newOcH < 0) {
+        //std::cout << "Chego Aqui3" << std::endl;
+        currOcupancy.resize((fOcW + newOcW) * (fOcH - newOcH),false);
+        std::fill(currOcupancy.begin(), currOcupancy.end(), false);
+        for (size_t u0 = 0; u0 < fOcW; u0++) {
+          size_t u1 = u0;
+          for (size_t v0 = 0; v0 < fOcH; v0++) {
+            size_t v1 = v0-newOcH;
+            currOcupancy[(v1 * (fOcW + newOcW)) + u1] = finalOcupancy[v0 * fOcW + u0];
+          }
+        }
+        for (size_t u0 = 0; u0 < next_patch.getPatch().getSizeU0(); u0++) {
+          size_t u1 = u0 + next_patch.getPosU() +
+                      patches[next_patch.getFather().getIndex()].getU0();
+          for (size_t v0 = 0; v0 <
+               next_patch.getPatch().getSizeV0(); v0++) {
+            if (currOcupancy[(v0 * (fOcW + newOcW)) + u1] == true
+                && next_patch.getPatch().getOccupancy()[v0 * (next_patch.getPatch().getSizeU0()) + u0] == true) {
+              fit = false;
+              break;
+            }
+            currOcupancy[(v0 * (fOcW + newOcW)) + u1] =
+              next_patch.getPatch().getOccupancy()[v0 * (next_patch.getPatch().getSizeU0()) + u0]
+              || currOcupancy[(v0 * (fOcW + newOcW)) + u1];
+          }
+          if(fit==false) {
+            break;
+          }
+        }
+      } else {
+        //std::cout << "Chego Aqui" << std::endl;
+        //std::cout << "Chego Aqui4" << std::endl;
+        currOcupancy.resize((fOcW + newOcW) * (fOcH + newOcH),false);
+        std::fill(currOcupancy.begin(), currOcupancy.end(), false);
+        //std::cout << newOcW << " " << newOcH << std::endl;
+        for (size_t u0 = 0; u0 < fOcW; u0++) {
+          size_t u1 = u0;
+          for (size_t v0 = 0; v0 < fOcH; v0++) {
+            size_t v1 = v0;
+            //std::cout << "Chego Aqui4" << std::endl;
+            currOcupancy[(v1 * (fOcW + newOcW)) + u1] = finalOcupancy[(v0 * fOcW) +
+                u0];
+          }
+        }
+        //std::cout << "Chego Aqui4" << std::endl;
+        for (size_t u0 = 0; u0 < next_patch.getPatch().getSizeU0(); u0++) {
+          size_t u1 = u0 + next_patch.getPosU() +
+                      patches[next_patch.getFather().getIndex()].getU0();
+          for (size_t v0 = 0; v0 <
+               next_patch.getPatch().getSizeV0(); v0++) {
+            size_t v1 = v0 + next_patch.getPosV() +
+                        patches[next_patch.getFather().getIndex()].getV0();
+            if (currOcupancy[(v1 * (fOcW + newOcW)) + u1]
+                == true && next_patch.getPatch().getOccupancy()[v0 * (next_patch.getPatch().getSizeU0()) + u0] ==
+                true) {
+              fit = false;
+              break;
+            }
+            currOcupancy[(v1 * (fOcW + newOcW)) + u1] =
+              next_patch.getPatch().getOccupancy()[v0 * (next_patch.getPatch().getSizeU0()) + u0]
+              || currOcupancy[(v1 * (fOcW + newOcW)) + u1];
+          }
+          if(fit==false) {
+            break;
+          }
+        }
+      }
+      if (fit == false) {
+        found_next = 0;
+        size_t s = 0;
+        while (found_next == 0) {
+          if (buddies_pool.size() == 0) {
+            nothing = true;
+            break;
+          }
+          next_patch = buddies_pool[0];
+          if (packed[next_patch.getPatch().getIndex()] == 0) {
+            found_next = 1;
+          }
+          buddies_pool.erase(buddies_pool.begin());
+          s++;
+        }
+        currOcupancy=finalOcupancy;
+      }
+	  if (buddies_pool.size() == 0) {
+        nothing = true;
+        break;
+      }
+    }
+    if (nothing==true) {
+      l++;
+      break;
+    }
+    //std::cout << "Father = " << next_patch.getFather().getIndex() << std::endl;
+    //std::cout << "Patch = " << next_patch.getPatch().getIndex() << std::endl;
+    //std::cout << "U = " << next_patch.getPosU() << std::endl;
+    //std::cout << "V = " << next_patch.getPosV() << std::endl;
+    //std::cout << "Score = " << next_patch.getScore() << std::endl;
+    //printMap(next_patch.getPatch().getOccupancy(), next_patch.getPatch().getSizeU0(),
+    //next_patch.getPatch().getSizeV0());
+    if (newOcW < 0 && newOcH < 0) {
+      fOcW = fOcW - newOcW;
+      fOcH =
+        fOcH - newOcH;
+      patches[next_patch.getPatch().getIndex()].getU0() = 0;
+      patches[next_patch.getPatch().getIndex()].getV0() = 0;
+      for (auto &patch : patches) {
+        if (packed[patch.getIndex()] == true) {
+          patch.getU0() = -newOcW + patch.getU0();
+          patch.getV0() = -newOcH + patch.getV0();
+        }
+      }
+      //patches[next_patch.getFather().getIndex()].getU0() = -newOcW +
+      //patches[next_patch.getFather().getIndex()].getU0();
+      //patches[next_patch.getFather().getIndex()].getV0() = -newOcH +
+      //patches[next_patch.getFather().getIndex()].getV0();
+    }
+    else if (newOcW < 0) {
+      fOcW = fOcW - newOcW;
+      fOcH = fOcH + newOcH;
+      patches[next_patch.getPatch().getIndex()].getU0() = 0;
+      patches[next_patch.getPatch().getIndex()].getV0() = int(next_patch.getPosV()) +
+          int(patches[next_patch.getFather().getIndex()].getV0());
+      for (auto &patch : patches) {
+        if
+        (packed[patch.getIndex()] == true) {
+          patch.getU0() = -newOcW + patch.getU0();
+        }
+      }
+      //patches[next_patch.getFather().getIndex()].getU0() = -newOcW +
+      //patches[next_patch.getFather().getIndex()].getU0();
+    }
+    else if (newOcH < 0) {
+      fOcW = fOcW + newOcW;
+      fOcH = fOcH - newOcH;
+      patches[next_patch.getPatch().getIndex()].getU0() =next_patch.getPosU() +
+          patches[next_patch.getFather().getIndex()].getU0();
+      patches[next_patch.getPatch().getIndex()].getV0() = 0;
+      for (auto &patch : patches) {
+        if (packed[patch.getIndex()] == true) {
+          patch.getV0() = -newOcH + patch.getV0();
+        }
+      }
+      //patches[next_patch.getFather().getIndex()].getV0() = -newOcH +
+      //patches[next_patch.getFather().getIndex()].getV0();
+    }
+    else {
+      fOcW = fOcW + newOcW;
+      fOcH = fOcH +
+             newOcH;
+      patches[next_patch.getPatch().getIndex()].getU0() = next_patch.getPosU() +
+          patches[next_patch.getFather().getIndex()].getU0();
+      patches[next_patch.getPatch().getIndex()].getV0() = next_patch.getPosV() +
+          patches[next_patch.getFather().getIndex()].getV0();
+      //std::cout << "Aqui " << patches[next_patch.getPatch().getIndex()].getV0() << std::endl;
+    }
+    packed[next_patch.getPatch().getIndex()] = 1;
+    finalOcupancy = currOcupancy;
+
+    l++;
+    //std::cout << (fOcW + newOcW) << " " << (fOcH + newOcH)<< std::endl;
+    //printMap(currOcupancy, fOcW, fOcH);
+    buddies_pool.insert(buddies_pool.end(), best_buddies[next_patch.getPatch().getIndex()].begin(),
+                        best_buddies[next_patch.getPatch().getIndex()].end());
+    //for (size_t k = 0; k < buddies_pool.size(); k++) {
+    //std::cout << "Father = " << buddies_pool[k].getFather().getIndex() << std::endl;
+    //std::cout << "Patch = " << buddies_pool[k].getPatch().getIndex() << std::endl;
+    //std::cout << "U = " << buddies_pool[k].getPosU() << std::endl;
+    //std::cout << "V = " << buddies_pool[k].getPosV() << std::endl;
+    //std::cout << "Score = " << buddies_pool[k].getScore() << std::endl;
+    //std::cout << std::endl;
+    //}
+    std::sort(buddies_pool.begin(), buddies_pool.end());
+    //std::cout << std::endl;std::cout << std::endl;
+    //std::cout << std::endl;std::cout << std::endl;
+    for (size_t k = 0; k < buddies_pool.size(); k++) {
+      //std::cout << "Father = " << buddies_pool[k].getFather().getIndex() << std::endl;
+      //std::cout << "Patch = " << buddies_pool[k].getPatch().getIndex() << std::endl;
+      //std::cout << "U = " << buddies_pool[k].getPosU() << std::endl;
+      //std::cout << "V = " << buddies_pool[k].getPosV() << std::endl;
+      //std::cout << "Score = " << buddies_pool[k].getScore() << std::endl;
+      //std::cout << std::endl;
+    }
+  }
+  for (auto &patch : patches) {
+    if (packed[patch.getIndex()] == true) {
+      kkpatches.push_back(patch);
+    }
+  }
+  printMap(currOcupancy, fOcW, fOcH);
+  height = fOcH * params_.occupancyResolution_;
+  width = fOcW * params_.occupancyResolution_;
+  //patches = kpatches;
+  std::cout << "Acabei Total" << std::endl;
+  patches = kkpatches;
+  // std::wcout << patches.size() << std::endl;
 }
 
 void PCCEncoder::packBB(PCCFrameContext &frame, size_t frameIndex) {
@@ -1507,7 +2172,7 @@ bool PCCEncoder::generateGeometryVideo(const PCCPointSet3 &source, PCCFrameConte
     generateMissedPointsPatch(source, frame);
     sortMissedPointsPatch(frame);
   }
-  /*std::ofstream fileoutp("patches23.txt");
+  /*std::ofstream fileoutp("spatches23.txt");
   fileoutp<<patches.size()<<"\n";
   for (const auto &patch : patches ) {
     fileoutp<<patch;
@@ -1521,7 +2186,7 @@ bool PCCEncoder::generateGeometryVideo(const PCCPointSet3 &source, PCCFrameConte
   } else if (string(params_.compressedStreamPath_).find("24") != std::string::npos) {
     fileinp = std::ifstream("patches24.txt");
   } else if (string(params_.compressedStreamPath_).find("23") != std::string::npos) {
-    fileinp = std::ifstream("patches23.txt");
+    fileinp = std::ifstream("spatches23.txt");
   } else {
     fileinp = std::ifstream("patches27.txt");
   }
@@ -1552,7 +2217,7 @@ bool PCCEncoder::generateGeometryVideo(const PCCPointSet3 &source, PCCFrameConte
     } else if (string(params_.variance).find("BBC") != std::string::npos) {
       packBB(frame, frameIndex);
     } else {
-      //pack(frame, frameIndex);
+      // pack(frame, frameIndex);
     }
   } else {
     // spatialConsistencyPack(frame , prevFrame);

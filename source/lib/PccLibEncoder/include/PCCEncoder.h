@@ -81,7 +81,7 @@ private:
   void dilate( PCCFrameContext &frame, PCCImage<T, 3> &image, PCCImage<T, 3> &simage, bool texture, const PCCImage<T, 3> *reference = nullptr );
   void mergePatches( PCCPatch &patch1, PCCPatch &patch2, PCCPatch &superpatch);
   void countPixels(PCCPatch &patch);
-  double computeSM(PCCPatch &father_patch, PCCPatch &bb_patch, std::vector<bool> occupancy_, size_t pos_u, size_t pos_v);
+  double computeSM(PCCPatch &father_patch, PCCPatch &bb_patch, std::vector<bool> occupancy_, size_t pos_u, size_t pos_v, PCCPatch &second_patch);
   void packBestBuddies(PCCFrameContext &frame, size_t frameIndex);
   void packBB(PCCFrameContext &frame, size_t frameIndex);
   int computeINT(size_t U0, size_t V0, size_t sizeU0, size_t sizeV0, size_t occupancySizeU, std::vector<bool> occupancy_);
